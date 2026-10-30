@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120E0D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dónde estoy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Dónde estoy</title>
+<meta name="description" content="Tu ubicación y coordenadas al momento para dársela a emergencias.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: una columna de lectura rápida — coordenadas enormes arriba, acciones grandes abajo */
+:root {
+  --bg: #F4F2F1;
+  --surface: #FFFFFF;
+  --ink: #17110F;
+  --muted: #6A5F5B;
+  --line: #E0D9D6;
+  --sos: #B3261E;
+  --ok: #1E8A52;
+  --warn: #B07A10;
+  --font-body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #120E0D; --surface: #1C1716; --ink: #F3EEEC; --muted: #A99D98; --line: #332926;
+    --sos: #F05A4F; --ok: #4CC384; --warn: #E2B04A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #120E0D; --surface: #1C1716; --ink: #F3EEEC; --muted: #A99D98; --line: #332926;
+  --sos: #F05A4F; --ok: #4CC384; --warn: #E2B04A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(18px + env(safe-area-inset-top, 0px)) calc(28px + env(safe-area-inset-bottom, 0px));
+}
+.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 12px; }
+button, a.btn { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sos); outline-offset: 2px; }
+
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
+.fix { font: 500 .8rem var(--font-data); display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.fix.live .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent); }
+.fix.weak .dot { background: var(--warn); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 6px; min-width: 0; }
+.coord-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fmt { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.fmt button { background: none; border: none; padding: 5px 10px; font: 500 .78rem var(--font-body); color: var(--muted); cursor: pointer; }
+.fmt button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.fmt-hint { font: 500 .78rem var(--font-body); color: var(--muted); }
+.label { font: 500 .72rem var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.coords { font: 700 clamp(1.5rem, 7.2vw, 2.1rem)/1.2 var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.coords span { display: block; }
+.alt { font: 500 1.05rem/1.5 var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.address { font-size: 1.05rem; font-weight: 500; overflow-wrap: anywhere; }
+/* Coordenadas a la izquierda y fecha · hora arriba a la derecha; si no caben, la fecha baja */
+.coordrow { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+/* En GMS y Náutico las coordenadas son más largas: fecha y hora en dos líneas, alineadas a la derecha */
+.coordrow.stack .stamp { display: grid; text-align: right; }
+.coordrow.stack .sep { display: none; }
+.coordrow .coords { min-width: 0; }
+.stamp { margin-left: auto; white-space: nowrap; padding-top: 4px; }
+.meta { font: 500 .8rem var(--font-data); color: var(--muted); }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
+  border-radius: 12px; padding: 14px 10px; font-weight: 800; text-decoration: none;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.btn.call { grid-column: 1 / -1; background: var(--sos); border-color: var(--sos); color: #FFFFFF; font-size: 1.55rem; padding: 20px; }
+.btn.call svg { width: 26px; height: 26px; }
+.btn svg { width: 20px; height: 20px; flex: none; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  background: var(--ink); color: var(--bg); font-size: .9rem; font-weight: 500; padding: 10px 16px; border-radius: 10px;
+  max-width: calc(100% - 32px); text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.toast:empty { display: none; }
+
+.notice { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 12px; padding: 14px; font-size: .92rem; }
+.notice b { display: block; margin-bottom: 4px; }
+.notice button { margin-top: 10px; background: var(--ink); color: var(--bg); border: none; border-radius: 8px; padding: 9px 14px; font-weight: 700; }
+.radio { font-size: .88rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
+.radio b { color: var(--ink); }
+footer { font-size: .76rem; color: var(--muted); }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dónde estoy</h1>
+    <div class="fix" id="fix"><span class="dot"></span><span id="fixTxt">Buscando GPS…</span></div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <section class="card" aria-live="polite">
+    <div class="coord-head">
+      <div class="label">Coordenadas</div>
+      <div class="fmt" id="fmt" role="group" aria-label="Formato de coordenadas">
+        <button type="button" data-f="dec">Decimal</button>
+        <button type="button" data-f="dms">GMS</button>
+        <button type="button" data-f="dm">Náutico</button>
+      </div>
+    </div>
+    <div class="coordrow" id="coordrow">
+      <div class="coords" id="dec"><span>–</span><span>–</span></div>
+      <div class="meta stamp"><span id="fixDate"></span><span class="sep"> · </span><span id="fixTime"></span></div>
+    </div>
+    <div class="meta" id="acc">&nbsp;</div>
+    <div class="fmt-hint" id="fmtHint"></div>
+  </section>
+
+
+  <section class="card">
+    <div class="label">Dirección aproximada</div>
+    <div class="address" id="addr">–</div>
+    <div class="meta" id="addrMeta">Necesita internet. Las coordenadas funcionan sin cobertura de datos.</div>
+  </section>
+
+  <div class="actions">
+    <a class="btn call" href="tel:112" id="call">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg>
+      Llamar al 112
+    </a>
+    <button class="btn" id="share" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+      Compartir
+    </button>
+    <button class="btn" id="copy" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+      Copiar
+    </button>
+    <a class="btn" id="maps" href="#" target="_blank" rel="noopener" style="grid-column: 1 / -1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      Ver en el mapa
+    </a>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="radio">En el mar, por radio: <b>VHF canal 16</b>.</div>
+
+  <footer>
+    La precisión depende del GPS del móvil: al aire libre suele ser de pocos metros. Direcciones de <a href="https://www.cartociudad.es" target="_blank" rel="noopener">CartoCiudad (IGN)</a> y <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let pos = null;           // última posición
+let lastGeo = null;       // última posición con dirección buscada
+let address = "";
+
+// ---------- Formatos ----------
+const dec = v => v.toFixed(5);
+// Grados, minutos y segundos: 36°35'35,2" N
+function dms(v, P, N) {
+  const h = v >= 0 ? P : N, a = Math.abs(v);
+  let d = Math.floor(a), m = Math.floor((a - d) * 60), s = ((a - d) * 60 - m) * 60;
+  if (s >= 59.95) { s = 0; m++; } if (m === 60) { m = 0; d++; }
+  return `${d}°${String(m).padStart(2, "0")}'${s.toFixed(1).padStart(4, "0").replace(".", ",")}" ${h}`;
+}
+// Grados y minutos decimales (náutico): 36° 35,587' N
+function dm(v, P, N) {
+  const h = v >= 0 ? P : N, a = Math.abs(v);
+  const d = Math.floor(a), m = (a - d) * 60;
+  return `${d}° ${m.toFixed(3).padStart(6, "0").replace(".", ",")}' ${h}`;
+}
+const FORMATS = {
+  dec: { lat: v => dec(v), lon: v => dec(v), hint: "Grados decimales · el formato de Google Maps" },
+  dms: { lat: v => dms(v, "N", "S"), lon: v => dms(v, "E", "O"), hint: "Grados, minutos y segundos" },
+  dm:  { lat: v => dm(v, "N", "S"),  lon: v => dm(v, "E", "O"),  hint: "Grados y minutos · el que se usa en el mar" },
+};
+let fmt = "dec";
+try { const f = localStorage.getItem("de_fmt"); if (FORMATS[f]) fmt = f; } catch {}
+function paintFmt() {
+  document.querySelectorAll("#fmt button").forEach(b => b.setAttribute("aria-pressed", b.dataset.f === fmt));
+  $("fmtHint").textContent = FORMATS[fmt].hint;
+  $("coordrow").classList.toggle("stack", fmt !== "dec");
+}
+const distM = (a, b) => {
+  const R = 6371000, toR = x => x * Math.PI / 180;
+  const dLat = toR(b.lat - a.lat), dLon = toR(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+// ---------- Pintar ----------
+function render() {
+  if (!pos) return;
+  const { lat, lon, acc, alt, t } = pos;
+  $("dec").innerHTML = `<span>${FORMATS[fmt].lat(lat)}</span><span>${FORMATS[fmt].lon(lon)}</span>`;
+  $("acc").textContent = `Precisión ±${Math.round(acc)} m${alt != null ? ` · Altitud ${Math.round(alt)} m` : ""}`;
+  $("maps").href = `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`;
+  const f = $("fix");
+  f.className = "fix " + (acc <= 30 ? "live" : "weak");
+  $("fixTxt").textContent = acc <= 30 ? "GPS activo" : "Precisión baja";
+}
+
+function messageText() {
+  if (!pos) return "";
+  const { lat, lon, acc } = pos;
+  return [
+    "Mi ubicación:",
+    `${FORMATS[fmt].lat(lat)}, ${FORMATS[fmt].lon(lon)} (±${Math.round(acc)} m)`,
+    address ? `Dirección aprox.: ${address}` : "",
+    `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`,
+  ].filter(Boolean).join("\n");
+}
+
+// ---------- Dirección ----------
+// 1º CartoCiudad (Instituto Geográfico Nacional): portales oficiales de España.
+// 2º OpenStreetMap si CartoCiudad no responde o no encuentra nada.
+// Se busca de nuevo cada vez que te mueves más de 15 m.
+const cap = t => String(t || "").toLowerCase().replace(/(^|[\s(\-\/])(\p{L})/gu, (m, a, c) => a + c.toUpperCase());
+// Partículas en minúscula salvo al principio: "Puerto de Santa Maria (El)"
+const capES = t => cap(t).replace(/(?<=\s)(De|Del|La|Las|Los|Y)(?=\s)/g, w => w.toLowerCase());
+// Quita tildes y mayúsculas para comparar nombres de calle
+const norm = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+// Tipos de vía habituales, para saber si el nombre ya lo lleva delante
+const VIA = /^(calle|avenida|avda|plaza|paseo|carretera|camino|glorieta|ronda|travesia|callejon|pasaje|urbanizacion|barriada|carril|cuesta|muelle|poligono|via|rambla|costanilla|bulevar)\b/i;
+
+async function fromCartoCiudad(lat, lon) {
+  const r = await fetch(`https://www.cartociudad.es/geocoder/api/geocoder/reverseGeocode?lon=${lon}&lat=${lat}`);
+  if (!r.ok) throw new Error(r.status);
+  const j = await r.json();
+  if (!j || !j.address) return null;
+  // tip_via puede venir como texto ("CALLE") o como código numérico; solo se usa si es texto
+  const tipo = j.tip_via && isNaN(j.tip_via) ? String(j.tip_via) : "";
+  let name = capES(j.address);
+  if (tipo && !VIA.test(norm(name))) name = capES(tipo) + " " + name;
+  return {
+    name, number: j.portalNumber && j.portalNumber !== "0" ? String(j.portalNumber) : "",
+    town: [j.postalCode, capES(j.poblacion || j.muni)].filter(Boolean).join(" "),
+    region: capES(j.province), postal: j.postalCode || "",
+  };
+}
+async function fromOSM(lat, lon) {
+  const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=es&zoom=18`);
+  if (!r.ok) throw new Error(r.status);
+  const j = await r.json();
+  const a = j.address || {};
+  const name = a.road || a.pedestrian || a.footway || a.path || "";
+  if (!name && !j.display_name) return null;
+  return {
+    name, number: a.house_number || "",
+    town: [a.postcode, a.city || a.town || a.village || a.municipality].filter(Boolean).join(" "),
+    region: a.province || a.state || "", full: j.display_name || "",
+    townName: a.city || a.town || a.village || a.municipality || "", province: a.province || "",
+  };
+}
+async function lookupAddress() {
+  if (!pos) return;
+  const here = { lat: pos.lat, lon: pos.lon };
+  if (lastGeo && distM(lastGeo, here) < 15) return;
+  lastGeo = here;
+  // Las dos fuentes a la vez: CartoCiudad da el número oficial,
+  // OpenStreetMap suele dar el nombre con tildes y con el tipo de vía ("Calle Espíritu Santo")
+  const [c, o] = await Promise.allSettled([fromCartoCiudad(here.lat, here.lon), fromOSM(here.lat, here.lon)]);
+  const cc = c.status === "fulfilled" ? c.value : null;
+  const os = o.status === "fulfilled" ? o.value : null;
+  let name = "", number = "", town = "", region = "", src = "";
+  if (cc) {
+    ({ name, number, town, region } = cc); src = "CartoCiudad (IGN)";
+    // Si OpenStreetMap tiene la misma calle, se usa su nombre (con tildes y tipo de vía)
+    if (os && os.name) {
+      const bare = n => norm(n).replace(VIA, "").trim();
+      if (bare(os.name) && bare(os.name) === bare(cc.name)) {
+        name = VIA.test(norm(os.name)) ? os.name : (cc.name.match(VIA)?.[0] ? cc.name.split(" ")[0] + " " + os.name : os.name);
+      }
+    }
+    // Municipio y provincia también con tildes si OpenStreetMap los tiene ("El Puerto de Santa María · Cádiz")
+    if (os && os.townName) town = [cc.postal, os.townName].filter(Boolean).join(" ");
+    if (os && os.province) region = os.province;
+  } else if (os) {
+    ({ name, number, town, region } = os); src = "OpenStreetMap";
+  }
+  const street = [name, number].filter(Boolean).join(", ");
+  const text = [street, town, region].filter(Boolean).join(" · ") || os?.full || "";
+  if (text) {
+    address = text;
+    $("addr").textContent = address;
+    $("addrMeta").textContent = `Punto más cercano según ${src}. Las coordenadas son el dato exacto.`;
+  } else {
+    lastGeo = null;
+    $("addr").textContent = "No se pudo obtener la dirección (sin conexión o punto sin calle cercana)";
+  }
+}
+
+// ---------- GPS ----------
+function showNotice(html, retry) {
+  $("notice").innerHTML = html + (retry ? `<br><button type="button" id="retry">Volver a intentarlo</button>` : "");
+  $("notice").hidden = false;
+  if (retry) $("retry").onclick = () => { $("notice").hidden = true; start(); };
+}
+let watchId = null;
+function start() {
+  if (!("geolocation" in navigator)) { showNotice("<b>Este navegador no permite usar la ubicación.</b>Ábrela en Safari."); return; }
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  $("fixTxt").textContent = "Buscando GPS…";
+  watchId = navigator.geolocation.watchPosition(p => {
+    $("notice").hidden = true;
+    pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp };
+    render(); lookupAddress();
+  }, err => {
+    $("fix").className = "fix"; $("fixTxt").textContent = "Sin ubicación";
+    if (err.code === 1) showNotice("<b>No hay permiso para la ubicación.</b>En el iPhone: Ajustes → Privacidad y seguridad → Localización → Sitios web de Safari → «Mientras se usa la app» y «Ubicación exacta» activada.", true);
+    else if (err.code === 3) showNotice("<b>El GPS está tardando.</b>Sal a un sitio abierto o acércate a una ventana.", true);
+    else showNotice("<b>No se pudo obtener la ubicación.</b>Comprueba que la localización está activada.", true);
+  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+}
+
+// ---------- Acciones ----------
+function toast(t) { $("toast").textContent = t; setTimeout(() => { $("toast").textContent = ""; }, 2500); }
+$("copy").onclick = async () => {
+  if (!pos) return toast("Aún no hay ubicación");
+  try { await navigator.clipboard.writeText(messageText()); toast("Ubicación copiada"); }
+  catch { toast("No se pudo copiar; mantén pulsadas las coordenadas para copiarlas"); }
+};
+$("share").onclick = async () => {
+  if (!pos) return toast("Aún no hay ubicación");
+  if (navigator.share) { try { await navigator.share({ title: "Mi ubicación", text: messageText() }); } catch {} }
+  else $("copy").click();
+};
+$("maps").addEventListener("click", e => { if (!pos) { e.preventDefault(); toast("Aún no hay ubicación"); } });
+
+// Reloj segundo a segundo con la hora real
+function tick() {
+  const now = new Date();
+  $("fixDate").textContent = now.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+  $("fixTime").textContent = now.toLocaleTimeString("es-ES");
+  // Si el GPS lleva más de 30 s sin dar una lectura nueva, se avisa
+  if (pos) {
+    const age = Math.round((now - pos.t) / 1000);
+    if (age > 30) { $("fix").className = "fix weak"; $("fixTxt").textContent = `Última lectura hace ${age < 120 ? age + " s" : Math.round(age / 60) + " min"}`; }
+  }
+}
+tick();
+setInterval(tick, 1000);
+
+$("fmt").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  fmt = b.dataset.f;
+  try { localStorage.setItem("de_fmt", fmt); } catch {}
+  paintFmt(); render();
+});
+paintFmt();
+start();
+// Al volver a la app, se reactiva el GPS
+document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
+
+// Modo sin conexión: guarda una copia de la app para abrirla sin cobertura
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
+</script>
+</body>
+</html>
