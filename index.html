@@ -342,7 +342,7 @@ async function lookupAddress() {
   if (text) {
     address = text;
     $("addr").textContent = address;
-    $("addrMeta").textContent = `Punto más cercano según ${src}. Las coordenadas son el dato exacto.`;
+    $("addrMeta").textContent = "Las coordenadas son el dato exacto.";
   } else {
     lastGeo = null;
     $("addr").textContent = "No se pudo obtener la dirección (sin conexión o punto sin calle cercana)";
