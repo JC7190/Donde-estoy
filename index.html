@@ -76,8 +76,6 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .address { font-size: 1.05rem; font-weight: 500; overflow-wrap: anywhere; }
 .coordbody { display: flex; gap: 12px; align-items: flex-start; }
 .coordmain { flex: 1; min-width: 0; display: grid; gap: 6px; }
-/* GMS y Náutico son más largos: letra algo más pequeña para que quepan junto a la columna */
-.coordmain.long .coords { font-size: clamp(1.15rem, 5.4vw, 1.6rem); }
 .stamp { white-space: nowrap; }
 .meta { font: 500 .8rem var(--font-data); color: var(--muted); }
 
@@ -236,7 +234,6 @@ try { const f = localStorage.getItem("de_fmt"); if (FORMATS[f]) fmt = f; } catch
 function paintFmt() {
   document.querySelectorAll("#fmt button").forEach(b => b.setAttribute("aria-pressed", b.dataset.f === fmt));
   $("fmtHint").textContent = FORMATS[fmt].hint;
-  $("coordmain").classList.toggle("long", fmt !== "dec");
 }
 const distM = (a, b) => {
   const R = 6371000, toR = x => x * Math.PI / 180;
