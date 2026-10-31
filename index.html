@@ -63,8 +63,10 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 6px; min-width: 0; }
 .coord-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.fmt { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.fmt button { background: none; border: none; padding: 5px 10px; font: 500 .78rem var(--font-body); color: var(--muted); cursor: pointer; }
+/* Formatos en columna, a la derecha de las coordenadas */
+.fmt { display: flex; flex-direction: column; flex: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; align-self: flex-start; }
+.fmt button { background: none; border: none; padding: 8px 12px; font: 500 .8rem var(--font-body); color: var(--muted); cursor: pointer; text-align: center; }
+.fmt button + button { border-top: 1px solid var(--line); }
 .fmt button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
 .fmt-hint { font: 500 .78rem var(--font-body); color: var(--muted); }
 .label { font: 500 .72rem var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
@@ -72,13 +74,11 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .coords span { display: block; }
 .alt { font: 500 1.05rem/1.5 var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .address { font-size: 1.05rem; font-weight: 500; overflow-wrap: anywhere; }
-/* Coordenadas a la izquierda y fecha · hora arriba a la derecha; si no caben, la fecha baja */
-.coordrow { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
-/* En GMS y Náutico las coordenadas son más largas: fecha y hora en dos líneas, alineadas a la derecha */
-.coordrow.stack .stamp { display: grid; text-align: right; }
-.coordrow.stack .sep { display: none; }
-.coordrow .coords { min-width: 0; }
-.stamp { margin-left: auto; white-space: nowrap; padding-top: 4px; }
+.coordbody { display: flex; gap: 12px; align-items: flex-start; }
+.coordmain { flex: 1; min-width: 0; display: grid; gap: 6px; }
+/* GMS y Náutico son más largos: letra algo más pequeña para que quepan junto a la columna */
+.coordmain.long .coords { font-size: clamp(1.15rem, 5.4vw, 1.6rem); }
+.stamp { white-space: nowrap; }
 .meta { font: 500 .8rem var(--font-data); color: var(--muted); }
 
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -118,18 +118,20 @@ footer a { color: inherit; }
   <section class="card" aria-live="polite">
     <div class="coord-head">
       <div class="label">Coordenadas</div>
+      <div class="meta stamp"><span id="fixDate"></span> · <span id="fixTime"></span></div>
+    </div>
+    <div class="coordbody">
+      <div class="coordmain" id="coordmain">
+        <div class="coords" id="dec"><span>–</span><span>–</span></div>
+        <div class="meta" id="acc">&nbsp;</div>
+        <div class="fmt-hint" id="fmtHint"></div>
+      </div>
       <div class="fmt" id="fmt" role="group" aria-label="Formato de coordenadas">
         <button type="button" data-f="dec">Decimal</button>
         <button type="button" data-f="dms">GMS</button>
         <button type="button" data-f="dm">Náutico</button>
       </div>
     </div>
-    <div class="coordrow" id="coordrow">
-      <div class="coords" id="dec"><span>–</span><span>–</span></div>
-      <div class="meta stamp"><span id="fixDate"></span><span class="sep"> · </span><span id="fixTime"></span></div>
-    </div>
-    <div class="meta" id="acc">&nbsp;</div>
-    <div class="fmt-hint" id="fmtHint"></div>
   </section>
 
 
@@ -188,16 +190,16 @@ function dm(v, P, N) {
   return `${d}° ${m.toFixed(3).padStart(6, "0").replace(".", ",")}' ${h}`;
 }
 const FORMATS = {
-  dec: { lat: v => dec(v), lon: v => dec(v), hint: "Grados decimales · el formato de Google Maps" },
-  dms: { lat: v => dms(v, "N", "S"), lon: v => dms(v, "E", "O"), hint: "Grados, minutos y segundos" },
-  dm:  { lat: v => dm(v, "N", "S"),  lon: v => dm(v, "E", "O"),  hint: "Grados y minutos · el que se usa en el mar" },
+  dec:  { pair: (la, lo) => [dec(la), dec(lo)], hint: "Grados decimales · el formato de Google Maps" },
+  dms:  { pair: (la, lo) => [dms(la, "N", "S"), dms(lo, "E", "O")], hint: "Grados, minutos y segundos" },
+  dm:   { pair: (la, lo) => [dm(la, "N", "S"), dm(lo, "E", "O")], hint: "Grados y minutos · el que se usa en el mar" },
 };
 let fmt = "dec";
 try { const f = localStorage.getItem("de_fmt"); if (FORMATS[f]) fmt = f; } catch {}
 function paintFmt() {
   document.querySelectorAll("#fmt button").forEach(b => b.setAttribute("aria-pressed", b.dataset.f === fmt));
   $("fmtHint").textContent = FORMATS[fmt].hint;
-  $("coordrow").classList.toggle("stack", fmt !== "dec");
+  $("coordmain").classList.toggle("long", fmt !== "dec");
 }
 const distM = (a, b) => {
   const R = 6371000, toR = x => x * Math.PI / 180;
@@ -210,7 +212,8 @@ const distM = (a, b) => {
 function render() {
   if (!pos) return;
   const { lat, lon, acc, alt, t } = pos;
-  $("dec").innerHTML = `<span>${FORMATS[fmt].lat(lat)}</span><span>${FORMATS[fmt].lon(lon)}</span>`;
+  const [l1, l2] = FORMATS[fmt].pair(lat, lon);
+  $("dec").innerHTML = `<span>${l1}</span><span>${l2}</span>`;
   $("acc").textContent = `Precisión ±${Math.round(acc)} m${alt != null ? ` · Altitud ${Math.round(alt)} m` : ""}`;
   $("maps").href = `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`;
   const f = $("fix");
@@ -223,7 +226,7 @@ function messageText() {
   const { lat, lon, acc } = pos;
   return [
     "Mi ubicación:",
-    `${FORMATS[fmt].lat(lat)}, ${FORMATS[fmt].lon(lon)} (±${Math.round(acc)} m)`,
+    `${FORMATS[fmt].pair(lat, lon).join(", ")} (±${Math.round(acc)} m)`,
     address ? `Dirección aprox.: ${address}` : "",
     `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`,
   ].filter(Boolean).join("\n");
