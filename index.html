@@ -63,10 +63,10 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 6px; min-width: 0; }
 .coord-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-/* Formatos en columna, a la derecha de las coordenadas */
-.fmt { display: flex; flex-direction: column; flex: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; align-self: flex-start; }
-.fmt button { background: none; border: none; padding: 8px 12px; font: 500 .8rem var(--font-body); color: var(--muted); cursor: pointer; text-align: center; }
-.fmt button + button { border-top: 1px solid var(--line); }
+/* Formatos en una fila, a todo el ancho del recuadro */
+.fmt { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.fmt button { flex: 1; min-width: 0; background: none; border: none; padding: 8px 4px; font: 500 .8rem var(--font-body); color: var(--muted); cursor: pointer; text-align: center; }
+.fmt button + button { border-left: 1px solid var(--line); }
 .fmt button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
 .fmt-hint { font: 500 .78rem var(--font-body); color: var(--muted); }
 .label { font: 500 .72rem var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
@@ -125,13 +125,13 @@ footer a { color: inherit; }
         <div class="coords" id="dec"><span>–</span><span>–</span></div>
         <div class="meta" id="acc">&nbsp;</div>
       </div>
-      <div class="fmt" id="fmt" role="group" aria-label="Formato de coordenadas">
+    </div>
+    <div class="fmt" id="fmt" role="group" aria-label="Formato de coordenadas">
         <button type="button" data-f="dec">Decimal</button>
         <button type="button" data-f="dms">GMS</button>
         <button type="button" data-f="dm">Náutico</button>
         <button type="button" data-f="utm">UTM</button>
         <button type="button" data-f="mgrs">MGRS</button>
-      </div>
     </div>
     <div class="fmt-hint" id="fmtHint"></div>
   </section>
