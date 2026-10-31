@@ -130,6 +130,8 @@ footer a { color: inherit; }
         <button type="button" data-f="dec">Decimal</button>
         <button type="button" data-f="dms">GMS</button>
         <button type="button" data-f="dm">Náutico</button>
+        <button type="button" data-f="utm">UTM</button>
+        <button type="button" data-f="mgrs">MGRS</button>
       </div>
     </div>
   </section>
@@ -189,10 +191,45 @@ function dm(v, P, N) {
   const d = Math.floor(a), m = (a - d) * 60;
   return `${d}° ${m.toFixed(3).padStart(6, "0").replace(".", ",")}' ${h}`;
 }
+// ---------- UTM y MGRS (elipsoide WGS84, equivalente a ETRS89 a efectos prácticos) ----------
+function toUTM(lat, lon) {
+  let zone = Math.floor((lon + 180) / 6) + 1;
+  if (lat >= 56 && lat < 64 && lon >= 3 && lon < 12) zone = 32;               // excepción de Noruega
+  if (lat >= 72 && lat < 84) {                                                // excepciones de Svalbard
+    if (lon >= 0 && lon < 9) zone = 31; else if (lon >= 9 && lon < 21) zone = 33;
+    else if (lon >= 21 && lon < 33) zone = 35; else if (lon >= 33 && lon < 42) zone = 37;
+  }
+  const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996;
+  const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const φ = lat * Math.PI / 180, λ = lon * Math.PI / 180, λ0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+  const N = a / Math.sqrt(1 - e2 * Math.sin(φ) ** 2), T = Math.tan(φ) ** 2, C = ep2 * Math.cos(φ) ** 2, A = Math.cos(φ) * (λ - λ0);
+  const M = a * ((1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256) * φ - (3 * e2 / 8 + 3 * e2 ** 2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * φ)
+    + (15 * e2 ** 2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * φ) - (35 * e2 ** 3 / 3072) * Math.sin(6 * φ));
+  const E = k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T ** 2 + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+  let Nn = k0 * (M + N * Math.tan(φ) * (A ** 2 / 2 + (5 - T + 9 * C + 4 * C ** 2) * A ** 4 / 24 + (61 - 58 * T + T ** 2 + 600 * C - 330 * ep2) * A ** 6 / 720));
+  if (lat < 0) Nn += 10000000;
+  const band = "CDEFGHJKLMNPQRSTUVWXX"[Math.max(0, Math.min(20, Math.floor((lat + 80) / 8)))];
+  return { zone, band, E, N: Nn };
+}
+function toMGRS(lat, lon) {
+  const u = toUTM(lat, lon);
+  const set = (u.zone - 1) % 3;                                       // columna: grupos de 8 letras según la zona
+  const colLetters = ["ABCDEFGH", "JKLMNPQR", "STUVWXYZ"][set];
+  const col = colLetters[Math.floor(u.E / 100000) - 1];
+  const rowLetters = "ABCDEFGHJKLMNPQRSTUV";                           // fila: 20 letras, desplazada en zonas pares
+  const row = rowLetters[(Math.floor(u.N / 100000) + (u.zone % 2 === 0 ? 5 : 0)) % 20];
+  const e = String(Math.floor(u.E % 100000)).padStart(5, "0"), n = String(Math.floor(u.N % 100000)).padStart(5, "0");
+  return { gzd: `${u.zone}${u.band}`, sq: col + row, e, n };
+}
+const grp = n => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");   // 4 474 257
 const FORMATS = {
   dec:  { pair: (la, lo) => [dec(la), dec(lo)], hint: "Grados decimales · el formato de Google Maps" },
   dms:  { pair: (la, lo) => [dms(la, "N", "S"), dms(lo, "E", "O")], hint: "Grados, minutos y segundos" },
   dm:   { pair: (la, lo) => [dm(la, "N", "S"), dm(lo, "E", "O")], hint: "Grados y minutos · el que se usa en el mar" },
+  utm:  { pair: (la, lo) => { const u = toUTM(la, lo); return [`${u.zone}${u.band} ${grp(Math.round(u.E))} E`, `${grp(Math.round(u.N))} N`]; },
+          hint: "UTM · huso, banda, X (Este) e Y (Norte) en metros. El de los mapas topográficos y rescate en montaña" },
+  mgrs: { pair: (la, lo) => { const m = toMGRS(la, lo); return [`${m.gzd} ${m.sq}`, `${m.e} ${m.n}`]; },
+          hint: "MGRS · sistema militar de la OTAN, precisión de 1 metro" },
 };
 let fmt = "dec";
 try { const f = localStorage.getItem("de_fmt"); if (FORMATS[f]) fmt = f; } catch {}
@@ -226,7 +263,8 @@ function messageText() {
   const { lat, lon, acc } = pos;
   return [
     "Mi ubicación:",
-    `${FORMATS[fmt].pair(lat, lon).join(", ")} (±${Math.round(acc)} m)`,
+    `${FORMATS[fmt].pair(lat, lon).join(fmt === "dec" ? ", " : " ")}${fmt === "utm" || fmt === "mgrs" ? " (" + fmt.toUpperCase() + ")" : ""} (±${Math.round(acc)} m)`,
+    fmt !== "dec" ? `${dec(lat)}, ${dec(lon)}` : "",
     address ? `Dirección aprox.: ${address}` : "",
     `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`,
   ].filter(Boolean).join("\n");
