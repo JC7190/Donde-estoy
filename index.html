@@ -124,7 +124,6 @@ footer a { color: inherit; }
       <div class="coordmain" id="coordmain">
         <div class="coords" id="dec"><span>–</span><span>–</span></div>
         <div class="meta" id="acc">&nbsp;</div>
-        <div class="fmt-hint" id="fmtHint"></div>
       </div>
       <div class="fmt" id="fmt" role="group" aria-label="Formato de coordenadas">
         <button type="button" data-f="dec">Decimal</button>
@@ -134,6 +133,7 @@ footer a { color: inherit; }
         <button type="button" data-f="mgrs">MGRS</button>
       </div>
     </div>
+    <div class="fmt-hint" id="fmtHint"></div>
   </section>
 
 
@@ -223,13 +223,13 @@ function toMGRS(lat, lon) {
 }
 const grp = n => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");   // 4 474 257
 const FORMATS = {
-  dec:  { pair: (la, lo) => [dec(la), dec(lo)], hint: "Grados decimales · el formato de Google Maps" },
-  dms:  { pair: (la, lo) => [dms(la, "N", "S"), dms(lo, "E", "O")], hint: "Grados, minutos y segundos" },
-  dm:   { pair: (la, lo) => [dm(la, "N", "S"), dm(lo, "E", "O")], hint: "Grados y minutos · el que se usa en el mar" },
+  dec:  { pair: (la, lo) => [dec(la), dec(lo)], hint: "Grados decimales · Formato de Google Maps" },
+  dms:  { pair: (la, lo) => [dms(la, "N", "S"), dms(lo, "E", "O")], hint: "Grados, minutos y segundos · Formato clásico" },
+  dm:   { pair: (la, lo) => [dm(la, "N", "S"), dm(lo, "E", "O")], hint: "Grados y minutos · El que se usa en el mar" },
   utm:  { pair: (la, lo) => { const u = toUTM(la, lo); return [`${u.zone}${u.band} ${grp(Math.round(u.E))} E`, `${grp(Math.round(u.N))} N`]; },
-          hint: "UTM · huso, banda, X (Este) e Y (Norte) en metros. El de los mapas topográficos y rescate en montaña" },
+          hint: "UTM · El de los mapas topográficos y rescate en montaña" },
   mgrs: { pair: (la, lo) => { const m = toMGRS(la, lo); return [`${m.gzd} ${m.sq}`, `${m.e} ${m.n}`]; },
-          hint: "MGRS · sistema militar de la OTAN, precisión de 1 metro" },
+          hint: "MGRS · Sistema militar de la OTAN, precisión de 1 metro" },
 };
 let fmt = "dec";
 try { const f = localStorage.getItem("de_fmt"); if (FORMATS[f]) fmt = f; } catch {}
