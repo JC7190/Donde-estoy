@@ -100,6 +100,34 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .notice button { margin-top: 10px; background: var(--ink); color: var(--bg); border: none; border-radius: 8px; padding: 9px 14px; font-weight: 700; }
 .radio { font-size: .88rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
 .radio b { color: var(--ink); }
+
+/* Pestañas: Ubicación / Brújula */
+.tabs { display: flex; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.tabs button { flex: 1; border: none; background: none; border-radius: 9px; padding: 10px 6px; font: 800 .95rem var(--font-body); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 7px; }
+.tabs button svg { width: 18px; height: 18px; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+.pane { display: grid; gap: 12px; }
+
+/* Brújula */
+.cmp { display: grid; gap: 14px; justify-items: center; padding: 18px 16px 20px; }
+.cmp-read { text-align: center; }
+.cmp-deg { font: 700 clamp(3rem, 15vw, 4.2rem)/1 var(--font-data); font-variant-numeric: tabular-nums; }
+.cmp-dir { font: 800 1.25rem var(--font-body); color: var(--sos); margin-top: 4px; letter-spacing: .04em; }
+.dialbox { position: relative; width: min(82vw, 340px); aspect-ratio: 1; }
+.dialbox svg { width: 100%; height: 100%; display: block; }
+.lubber { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 11px solid transparent; border-right: 11px solid transparent; border-top: 18px solid var(--sos); z-index: 2; }
+.d-ring { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.d-tick { stroke: var(--muted); stroke-width: 1.5; }
+.d-tick.big { stroke: var(--ink); stroke-width: 3; }
+.d-num { font: 500 13px var(--font-data); fill: var(--muted); text-anchor: middle; dominant-baseline: middle; }
+.d-card { font: 800 30px var(--font-body); fill: var(--ink); text-anchor: middle; dominant-baseline: middle; }
+.d-card.n { fill: var(--sos); }
+.d-inter { font: 800 16px var(--font-body); fill: var(--muted); text-anchor: middle; dominant-baseline: middle; }
+.d-center { fill: var(--ink); }
+.cmp-btn { background: var(--sos); color: #FFFFFF; border: none; border-radius: 12px; padding: 14px 22px; font: 800 1.05rem var(--font-body); }
+.cmp-note { font-size: .82rem; color: var(--muted); text-align: center; max-width: 34ch; }
+.cmp-meta { font: 500 .8rem var(--font-data); color: var(--muted); text-align: center; }
 footer { font-size: .76rem; color: var(--muted); }
 footer a { color: inherit; }
 </style>
@@ -111,6 +139,18 @@ footer a { color: inherit; }
     <div class="fix" id="fix"><span class="dot"></span><span id="fixTxt">Buscando GPS…</span></div>
   </header>
 
+  <div class="tabs" role="tablist" aria-label="Secciones">
+    <button type="button" role="tab" id="tLoc" aria-selected="true" aria-controls="pLoc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      Ubicación
+    </button>
+    <button type="button" role="tab" id="tCmp" aria-selected="false" aria-controls="pCmp">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></svg>
+      Brújula
+    </button>
+  </div>
+
+  <div class="pane" id="pLoc" role="tabpanel" aria-labelledby="tLoc">
   <div class="notice" id="notice" hidden></div>
 
   <section class="card" aria-live="polite">
@@ -159,6 +199,24 @@ footer a { color: inherit; }
       Ver en el mapa
     </a>
   </div>
+  </div>
+
+  <div class="pane" id="pCmp" role="tabpanel" aria-labelledby="tCmp" hidden>
+    <section class="card cmp">
+      <div class="cmp-read" aria-live="polite">
+        <div class="cmp-deg" id="cDeg">···°</div>
+        <div class="cmp-dir" id="cDir">&nbsp;</div>
+      </div>
+      <div class="dialbox">
+        <div class="lubber" aria-hidden="true"></div>
+        <svg viewBox="-160 -160 320 320" aria-hidden="true"><g id="dial"></g><circle class="d-center" r="5"/></svg>
+      </div>
+      <button class="cmp-btn" id="cOn" type="button">Activar brújula</button>
+      <div class="cmp-note" id="cNote">Pon el móvil en horizontal, lejos de imanes y metales. Si marca raro, mueve el móvil haciendo un ocho para calibrarla.</div>
+      <div class="cmp-meta" id="cMeta"></div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status"></div>
 
   <div class="radio">En el mar, por radio: <b>VHF canal 16</b>.</div>
@@ -407,6 +465,92 @@ paintFmt();
 start();
 // Al volver a la app, se reactiva el GPS
 document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
+
+
+// ---------- Pestañas ----------
+function showTab(t) {
+  const cmp = t === "cmp";
+  $("tLoc").setAttribute("aria-selected", !cmp); $("tCmp").setAttribute("aria-selected", cmp);
+  $("pLoc").hidden = cmp; $("pCmp").hidden = !cmp;
+  try { localStorage.setItem("de_tab", t); } catch {}
+  if (cmp) autoCompass();
+}
+$("tLoc").onclick = () => showTab("loc");
+$("tCmp").onclick = () => showTab("cmp");
+
+// ---------- Brújula ----------
+// Esfera dibujada una vez; luego solo se gira
+(function drawDial() {
+  const g = [], R = 150;
+  g.push(`<circle class="d-ring" r="${R}"/>`);
+  for (let a = 0; a < 360; a += 5) {
+    const big = a % 30 === 0, r1 = R - (big ? 18 : a % 10 === 0 ? 11 : 6), t = (a - 90) * Math.PI / 180;
+    g.push(`<line class="d-tick${big ? " big" : ""}" x1="${(R - 2) * Math.cos(t)}" y1="${(R - 2) * Math.sin(t)}" x2="${r1 * Math.cos(t)}" y2="${r1 * Math.sin(t)}"/>`);
+    if (big && a % 90 !== 0) { const rr = R - 32; g.push(`<text class="d-num" x="${rr * Math.cos(t)}" y="${rr * Math.sin(t)}" transform="rotate(${a} ${rr * Math.cos(t)} ${rr * Math.sin(t)})">${a}</text>`); }
+  }
+  const card = [["N", 0, "n"], ["E", 90, ""], ["S", 180, ""], ["O", 270, ""]];
+  for (const [l, a, c] of card) { const t = (a - 90) * Math.PI / 180, rr = R - 42; g.push(`<text class="d-card ${c}" x="${rr * Math.cos(t)}" y="${rr * Math.sin(t)}" transform="rotate(${a} ${rr * Math.cos(t)} ${rr * Math.sin(t)})">${l}</text>`); }
+  for (const [l, a] of [["NE", 45], ["SE", 135], ["SO", 225], ["NO", 315]]) { const t = (a - 90) * Math.PI / 180, rr = R - 46; g.push(`<text class="d-inter" x="${rr * Math.cos(t)}" y="${rr * Math.sin(t)}" transform="rotate(${a} ${rr * Math.cos(t)} ${rr * Math.sin(t)})">${l}</text>`); }
+  g.push(`<path d="M0 -${R - 60} L9 0 L-9 0 Z" fill="var(--sos)"/><path d="M0 ${R - 60} L9 0 L-9 0 Z" fill="var(--muted)"/>`);
+  $("dial").innerHTML = g.join("");
+})();
+const PUNTOS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+const NOMBRES = { N: "Norte", E: "Este", S: "Sur", O: "Oeste", NE: "Noreste", SE: "Sureste", SO: "Suroeste", NO: "Noroeste" };
+let shown = null, target = null, cmpOn = false, gotReading = false;
+function onHeading(h) {
+  if (h == null || isNaN(h)) return;
+  gotReading = true;
+  target = (h + 360) % 360;
+  if (shown == null) shown = target;
+}
+// Suavizado: gira por el camino corto (de 359° a 1° no da la vuelta entera)
+function animate() {
+  if (target != null) {
+    let d = ((target - shown + 540) % 360) - 180;
+    shown += d * 0.18;
+    $("dial").setAttribute("transform", `rotate(${(-shown).toFixed(2)})`);
+    const deg = Math.round((target + 360) % 360) % 360;
+    $("cDeg").textContent = `${deg}°`;
+    const p = PUNTOS[Math.round(deg / 22.5) % 16];
+    $("cDir").textContent = NOMBRES[p] ? `${p} · ${NOMBRES[p]}` : p;
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+function screenAngle() { return (screen.orientation && screen.orientation.angle) || window.orientation || 0; }
+function startCompass() {
+  if (cmpOn) return; cmpOn = true;
+  $("cOn").hidden = true;
+  $("cMeta").textContent = "Norte magnético";
+  if ("ondeviceorientationabsolute" in window) {
+    // Android (Chrome): orientación absoluta respecto al norte
+    addEventListener("deviceorientationabsolute", e => { if (e.alpha != null) onHeading(360 - e.alpha + screenAngle()); });
+  } else {
+    addEventListener("deviceorientation", e => {
+      if (e.webkitCompassHeading != null) onHeading(e.webkitCompassHeading + screenAngle());   // iPhone
+      else if (e.absolute && e.alpha != null) onHeading(360 - e.alpha + screenAngle());
+    });
+  }
+  setTimeout(() => { if (!gotReading) { $("cNote").textContent = "Este dispositivo no tiene brújula o no la deja usar al navegador. En un ordenador no funciona: úsala en el móvil."; $("cMeta").textContent = ""; } }, 3000);
+}
+async function enableCompass() {
+  // En iPhone hay que pedir permiso tocando un botón
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    try {
+      const r = await DeviceOrientationEvent.requestPermission();
+      const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      if (r !== "granted" && ios) { $("cNote").textContent = "Sin permiso para la brújula. Cierra la app del todo, ábrela otra vez y pulsa «Activar brújula» → Permitir."; return; }
+    } catch {}
+  }
+  startCompass();
+}
+// En Android no hace falta permiso: arranca sola al abrir la pestaña
+function autoCompass() {
+  const needsPermission = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+  if (!needsPermission) startCompass();
+}
+$("cOn").onclick = enableCompass;
+try { if (localStorage.getItem("de_tab") === "cmp") showTab("cmp"); } catch {}
 
 // Modo sin conexión: guarda una copia de la app para abrirla sin cobertura
 if ("serviceWorker" in navigator) {
