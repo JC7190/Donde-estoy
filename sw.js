@@ -1,7 +1,7 @@
 // Copia local de la app para que abra sin conexión.
 // La página se pide primero a internet (para tener siempre la última versión)
 // y, si no hay cobertura, se usa la copia guardada.
-const CACHE = "donde-estoy-brujula-v1";
+const CACHE = "donde-estoy-brujula-v2";
 const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
