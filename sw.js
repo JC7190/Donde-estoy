@@ -1,7 +1,7 @@
 // Copia local de la app para que abra sin conexión.
 // La página se pide primero a internet (para tener siempre la última versión)
 // y, si no hay cobertura, se usa la copia guardada.
-const CACHE = "donde-estoy-brujula-v2";
+const CACHE = "donde-estoy-brujula-v3";
 const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -20,7 +20,7 @@ self.addEventListener("fetch", e => {
   if (/cartociudad\.es|openstreetmap\.org/.test(url.hostname)) return;
   // Páginas de la app: internet primero, copia guardada si no hay cobertura
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(r => {
+    e.respondWith(fetch(req, { cache: "no-store" }).then(r => {
       const copy = r.clone(); caches.open(CACHE).then(c => c.put("index.html", copy)); return r;
     }).catch(() => caches.match("index.html")));
     return;
