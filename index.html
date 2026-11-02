@@ -13,9 +13,13 @@
 <link rel="manifest" href="manifest.json">
 <title>Dónde estoy</title>
 <meta name="description" content="Tu ubicación y coordenadas al momento para dársela a emergencias.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Tipos de letra dentro de la app: no espera a internet para pintar */
+@font-face{font-family:"Archivo";src:url(fonts/archivo-latin-500-normal.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"Archivo";src:url(fonts/archivo-latin-800-normal.woff2) format("woff2");font-weight:800;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/jetbrains-mono-latin-500-normal.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/jetbrains-mono-latin-700-normal.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+</style>
 <style>
 /* Layout: una columna de lectura rápida — coordenadas enormes arriba, acciones grandes abajo */
 :root {

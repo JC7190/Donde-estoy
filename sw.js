@@ -1,9 +1,11 @@
 // Copia local de la app para que abra sin conexión.
 // Se abre siempre con la copia guardada (rápido y sin cobertura);
 // la versión nueva se baja por detrás y se ve en la siguiente apertura.
-const CACHE = "donde-estoy-v5";
+const CACHE = "donde-estoy-v6";
 const MAP_CACHE = "mapa-datos";   // mapa descargado: no se borra al actualizar la app
-const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
+const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png",
+  "fonts/archivo-latin-500-normal.woff2", "fonts/archivo-latin-800-normal.woff2",
+  "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting()));
