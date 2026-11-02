@@ -101,6 +101,37 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .radio { font-size: .88rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
 .radio b { color: var(--ink); }
 
+
+/* Mapa */
+.mapbox { position: relative; height: min(62vh, 560px); min-height: 300px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+#map { position: absolute; inset: 0; }
+.map-btn { position: absolute; right: 10px; bottom: 34px; width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12);
+  background: #FFFFFF; color: #17110F; display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.map-btn svg { width: 24px; height: 24px; }
+.map-btn.on { color: #FFFFFF; background: var(--sos); border-color: var(--sos); }
+.map-msg { position: absolute; left: 10px; right: 10px; top: 10px; background: rgba(23,17,15,.86); color: #FFF; border-radius: 10px; padding: 10px 12px; font-size: .88rem; }
+.map-gate { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; z-index: 3;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--surface) 70%, transparent), var(--bg)); }
+.gate-btn { display: flex; align-items: center; gap: 10px; background: var(--sos); color: #FFFFFF; border: none; border-radius: 14px; padding: 16px 24px;
+  font: 800 1.2rem var(--font-body); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.gate-btn svg { width: 24px; height: 24px; }
+.gate-btn:disabled { opacity: .6; }
+.gate-note { font-size: .85rem; color: var(--muted); text-align: center; padding: 0 20px; }
+#map { visibility: hidden; }
+.dl-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.dl-state { font-weight: 800; font-size: 1.05rem; margin-top: 2px; }
+.dl-btn { background: var(--ink); color: var(--surface); border: none; border-radius: 10px; padding: 11px 16px; font-weight: 800; flex: none; }
+.dl-btn:disabled { opacity: .5; }
+.bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.dl-del { justify-self: start; background: none; border: none; color: var(--muted); text-decoration: underline; padding: 4px 0; font-size: .85rem; }
+.maplibregl-ctrl-attrib { font-size: 10px; }
+.me { width: 56px; height: 56px; pointer-events: none; }
+.me svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); transition: transform .15s linear; }
+.me .tip { display: none; }
+.me.has-dir .tip { display: inline; }
+.me.has-dir .round { display: none; }
+
 /* Pestañas: Ubicación / Brújula */
 .tabs { display: flex; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
 .tabs button { flex: 1; border: none; background: none; border-radius: 9px; padding: 10px 6px; font: 800 .95rem var(--font-body); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 7px; }
@@ -147,6 +178,10 @@ footer a { color: inherit; }
     <button type="button" role="tab" id="tCmp" aria-selected="false" aria-controls="pCmp">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></svg>
       Brújula
+    </button>
+    <button type="button" role="tab" id="tMap" aria-selected="false" aria-controls="pMap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>
+      Mapa
     </button>
   </div>
 
@@ -214,6 +249,35 @@ footer a { color: inherit; }
       <button class="cmp-btn" id="cOn" type="button">Activar brújula</button>
       <div class="cmp-note" id="cNote">Pon el móvil en horizontal, lejos de imanes y metales.</div>
       <div class="cmp-meta" id="cMeta"></div>
+    </section>
+  </div>
+
+  <div class="pane" id="pMap" role="tabpanel" aria-labelledby="tMap" hidden>
+    <div class="mapbox" id="mapbox">
+      <div id="map"></div>
+      <div class="map-gate" id="mGate">
+        <button type="button" class="gate-btn" id="mActivate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>
+          Activar mapa
+        </button>
+        <div class="gate-note">Con el norte siempre arriba. Tu punto marca hacia dónde miras.</div>
+      </div>
+      <button type="button" class="map-btn" id="mCenter" aria-label="Centrar en mi posición" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+      </button>
+      <div class="map-msg" id="mMsg" hidden></div>
+    </div>
+    <section class="card dl" id="dlCard">
+      <div class="dl-head">
+        <div>
+          <div class="label">Mapa sin conexión</div>
+          <div class="dl-state" id="dlState">No descargado</div>
+        </div>
+        <button type="button" class="dl-btn" id="dlBtn">Descargar</button>
+      </div>
+      <div class="bar" id="dlBar" hidden><span id="dlFill"></span></div>
+      <div class="meta" id="dlMeta">España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 400–500 MB. Mejor con wifi.</div>
+      <button type="button" class="dl-del" id="dlDel" hidden>Borrar mapa guardado</button>
     </section>
   </div>
 
@@ -415,7 +479,7 @@ function start() {
   watchId = navigator.geolocation.watchPosition(p => {
     $("notice").hidden = true;
     pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp };
-    render(); lookupAddress();
+    render(); lookupAddress(); placeMe(false);
   }, err => {
     $("fix").className = "fix"; $("fixTxt").textContent = "Sin ubicación";
     if (err.code === 1) showNotice("<b>No hay permiso para la ubicación.</b>En el iPhone: Ajustes → Privacidad y seguridad → Localización → Sitios web de Safari → «Mientras se usa la app» y «Ubicación exacta» activada.", true);
@@ -464,16 +528,226 @@ start();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
 
 
+
+// ---------- Mapa sin conexión ----------
+// Datos: OpenFreeMap (OpenStreetMap) para carreteras, pueblos y picos; relieve de Terrain Tiles (AWS).
+// Todo se guarda en el móvil en una caché aparte que no se borra al actualizar la app.
+const ML_VER = "5.24.0";
+const ML_JS = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/maplibre-gl.js`;
+const ML_CSS = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/maplibre-gl.css`;
+const VEC = "https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf";
+const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
+const MAP_CACHE = "mapa-datos";
+const VEC_MAX = 11, DEM_MAX = 8;
+const MAP_VER = 2;   // 2 = con carreteras locales (nivel 11)
+// Zonas: península + Baleares, y Canarias
+const AREAS = [[-9.6, 35.8, 4.6, 43.95], [-18.3, 27.5, -13.3, 29.5]];
+const t2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
+const t2y = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
+function tileUrls() {
+  const out = new Set();
+  const add = (tpl, z0, z1) => { for (let z = z0; z <= z1; z++) for (const [w, s, e, n] of AREAS)
+    for (let x = t2x(w, z); x <= t2x(e, z); x++) for (let y = t2y(n, z); y <= t2y(s, z); y++)
+      out.add(tpl.replace("{z}", z).replace("{x}", x).replace("{y}", y)); };
+  add(VEC, 0, VEC_MAX); add(DEM, 0, DEM_MAX);
+  for (const f of ["Noto Sans Regular", "Noto Sans Bold"]) for (const r of ["0-255", "256-511"])
+    out.add(GLYPHS.replace("{fontstack}", encodeURIComponent(f)).replace("{range}", r));
+  out.add(ML_JS); out.add(ML_CSS);
+  return [...out];
+}
+
+const NAME = ["coalesce", ["get", "name:es"], ["get", "name"]];
+function mapStyle(dark) {
+  const C = dark ? {
+    bg: "#1E1A19", water: "#1E2E3B", river: "#2C4659", border: "#6E625C", shadow: "#000000", light: "#4A4440", accent: "#2A2422",
+    casing: "#0F0C0B", tertiary: "#5C534E", secondary: "#8C7A4A", primary: "#B8893A", trunk: "#C2702F", motorway: "#D25E2C",
+    ref: "#F3EEEC", refHalo: "#1E1A19", text: "#F3EEEC", textSoft: "#D8CEC9", halo: "#141110", peak: "#E2C9A4",
+  } : {
+    bg: "#F4F2EE", water: "#CFE2F0", river: "#A9CBE4", border: "#9C918A", shadow: "#5B5146", light: "#FFFFFF", accent: "#8A7D70",
+    casing: "#8C7B6B", tertiary: "#FFFFFF", secondary: "#FFF4C4", primary: "#FFE08A", trunk: "#F7B267", motorway: "#E8743B",
+    ref: "#3E3027", refHalo: "#FFFFFF", text: "#17110F", textSoft: "#2A2420", halo: "#FFFFFF", peak: "#6B4E2E",
+  };
+  return {
+    version: 8,
+    glyphs: GLYPHS,
+    sources: {
+      v: { type: "vector", tiles: [VEC], minzoom: 0, maxzoom: VEC_MAX, attribution: "© OpenStreetMap · OpenFreeMap" },
+      dem: { type: "raster-dem", tiles: [DEM], tileSize: 256, maxzoom: DEM_MAX, encoding: "terrarium", attribution: "Relieve: Terrain Tiles" },
+    },
+    layers: [
+      { id: "fondo", type: "background", paint: { "background-color": C.bg } },
+      { id: "relieve", type: "hillshade", source: "dem", paint: { "hillshade-exaggeration": dark ? 0.55 : 0.45, "hillshade-shadow-color": C.shadow, "hillshade-highlight-color": C.light, "hillshade-accent-color": C.accent } },
+      { id: "agua", type: "fill", source: "v", "source-layer": "water", paint: { "fill-color": C.water } },
+      { id: "rios", type: "line", source: "v", "source-layer": "waterway", filter: ["==", ["get", "class"], "river"], paint: { "line-color": C.river, "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 2] } },
+      { id: "frontera", type: "line", source: "v", "source-layer": "boundary", filter: ["<=", ["get", "admin_level"], 4], paint: { "line-color": C.border, "line-width": 1, "line-dasharray": [3, 2] } },
+      ...[["tertiary", 0.4, 2.2, 9], ["secondary", 0.6, 3, 8], ["primary", 0.8, 3.6, 7], ["trunk", 1, 4.2, 5], ["motorway", 1.2, 4.8, 5]].flatMap(([c, w0, w1, mz]) => [
+        { id: `rc-${c}`, type: "line", source: "v", "source-layer": "transportation", minzoom: mz, filter: ["==", ["get", "class"], c],
+          layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": C.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 6, w0 + 0.8, 14, w1 * 2.2 + 1.6] } },
+        { id: `r-${c}`, type: "line", source: "v", "source-layer": "transportation", minzoom: mz, filter: ["==", ["get", "class"], c],
+          layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": C[c], "line-width": ["interpolate", ["linear"], ["zoom"], 6, w0, 14, w1 * 2.2] } } ]),
+      { id: "ref", type: "symbol", source: "v", "source-layer": "transportation_name", minzoom: 8,
+        filter: ["all", ["has", "ref"], ["match", ["get", "class"], ["motorway", "trunk", "primary", "secondary", "tertiary"], true, false]],
+        layout: { "symbol-placement": "line", "symbol-spacing": 280, "text-field": ["get", "ref"], "text-font": ["Noto Sans Bold"], "text-size": 10.5, "text-rotation-alignment": "viewport", "text-padding": 6 },
+        paint: { "text-color": C.ref, "text-halo-color": C.refHalo, "text-halo-width": 2.2 } },
+      { id: "picos", type: "symbol", source: "v", "source-layer": "mountain_peak", minzoom: 8, filter: ["has", "ele"],
+        layout: { "text-field": ["concat", "▲ ", ["coalesce", NAME, ""], "\n", ["to-string", ["get", "ele"]], " m"], "text-font": ["Noto Sans Regular"], "text-size": 11, "text-anchor": "top", "text-padding": 4 },
+        paint: { "text-color": C.peak, "text-halo-color": C.halo, "text-halo-width": 1.6 } },
+      { id: "pueblos", type: "symbol", source: "v", "source-layer": "place", filter: ["match", ["get", "class"], ["village"], true, false], minzoom: 9,
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Regular"], "text-size": 11.5, "text-padding": 3 },
+        paint: { "text-color": C.textSoft, "text-halo-color": C.halo, "text-halo-width": 1.8 } },
+      { id: "villas", type: "symbol", source: "v", "source-layer": "place", filter: ["match", ["get", "class"], ["town"], true, false], minzoom: 7,
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Bold"], "text-size": ["interpolate", ["linear"], ["zoom"], 7, 11, 12, 14], "text-padding": 3 },
+        paint: { "text-color": C.text, "text-halo-color": C.halo, "text-halo-width": 2 } },
+      { id: "ciudades", type: "symbol", source: "v", "source-layer": "place", filter: ["match", ["get", "class"], ["city"], true, false],
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Bold"], "text-size": ["interpolate", ["linear"], ["zoom"], 5, 12, 12, 18], "text-padding": 4 },
+        paint: { "text-color": C.text, "text-halo-color": C.halo, "text-halo-width": 2.4 } },
+    ],
+  };
+}
+const darkMQ = matchMedia("(prefers-color-scheme: dark)");
+const isDark = () => darkMQ.matches;
+darkMQ.addEventListener("change", () => { if (map) map.setStyle(mapStyle(isDark())); });
+
+
+// El mapa ocupa justo el alto que queda libre, para ver toda la pestaña sin deslizar
+function fitMap() {
+  const mb = $("mapbox"); if (!mb || $("pMap").hidden) return;
+  const extra = document.documentElement.scrollHeight - mb.offsetHeight;
+  const h = Math.max(300, Math.floor(window.innerHeight - extra));
+  if (Math.abs(mb.offsetHeight - h) > 1) { mb.style.height = h + "px"; if (map) map.resize(); }
+}
+addEventListener("resize", () => setTimeout(fitMap, 60));
+addEventListener("orientationchange", () => setTimeout(fitMap, 300));
+let map = null, meMarker = null, meCone = null, follow = true, mlLoading = null;
+function loadMapLibre() {
+  if (window.maplibregl) return Promise.resolve();
+  if (mlLoading) return mlLoading;
+  mlLoading = new Promise((ok, ko) => {
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = ML_CSS; document.head.appendChild(l);
+    const sc = document.createElement("script"); sc.src = ML_JS; sc.onload = ok; sc.onerror = () => { mlLoading = null; ko(); }; document.head.appendChild(sc);
+  });
+  return mlLoading;
+}
+function mapMsg(t) { $("mMsg").textContent = t || ""; $("mMsg").hidden = !t; }
+let mapOn = false;
+async function openMap() {
+  paintDl(); fitMap();
+  if (map) map.resize();
+}
+// Botón "Activar mapa": pide la orientación (como la brújula) y muestra el mapa
+async function activateMap() {
+  $("mActivate").disabled = true;
+  await enableCompass();
+  try { await loadMapLibre(); }
+  catch { $("mActivate").disabled = false; mapMsg("Para ver el mapa la primera vez hace falta internet. Ábrelo con cobertura y pulsa «Descargar» para tenerlo siempre."); return; }
+  mapMsg(""); mapOn = true;
+  $("mGate").hidden = true; $("map").style.visibility = "visible"; $("mCenter").hidden = false;
+  map = new maplibregl.Map({
+    container: "map", style: mapStyle(isDark()), center: pos ? [pos.lon, pos.lat] : [-4, 40], zoom: pos ? 11 : 5,
+    minZoom: 4, maxZoom: 15, attributionControl: { compact: true }, pitchWithRotate: false, dragRotate: false,
+  });
+  map.touchZoomRotate.disableRotation();
+  map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-left");
+  map.on("dragstart", () => { follow = false; $("mCenter").classList.remove("on"); });
+  map.on("load", () => { placeMe(true); document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); });
+  $("mCenter").classList.add("on");
+  setTimeout(() => { if (!gotReading) mapMsg("Este dispositivo no tiene brújula: no se puede mostrar hacia dónde miras."); setTimeout(() => mapMsg(""), 4000); }, 3500);
+}
+$("mActivate").onclick = activateMap;
+function placeMe(jump) {
+  if (!map || !pos) return;
+  if (!meMarker) {
+    // Tu posición: círculo azul con una punta que señala hacia donde miras (centro del círculo = donde estás)
+    const el = document.createElement("div"); el.className = "me";
+    el.innerHTML = `<svg viewBox="-28 -28 56 56" aria-hidden="true">
+      <path class="tip" d="M0 -23 L10.237 -6.261 A12 12 0 1 1 -10.237 -6.261 Z" fill="#3B74C4" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle class="round" r="12" fill="#3B74C4" stroke="#FFFFFF" stroke-width="2.5"/>
+      <circle r="5" fill="#FFFFFF"/></svg>`;
+    meCone = el;
+    meMarker = new maplibregl.Marker({ element: el }).setLngLat([pos.lon, pos.lat]).addTo(map);
+  } else meMarker.setLngLat([pos.lon, pos.lat]);
+  if (follow) map.jumpTo({ center: [pos.lon, pos.lat], zoom: jump ? Math.max(map.getZoom(), 11) : map.getZoom() });
+}
+$("mCenter").onclick = () => { follow = true; $("mCenter").classList.add("on"); if (pos) placeMe(true); else toast("Aún no hay ubicación"); };
+// Cono de la dirección a la que miras (usa la brújula si está activada)
+setInterval(() => { if (meCone && target != null) { meCone.classList.add("has-dir"); meCone.querySelector("svg").style.transform = `rotate(${target.toFixed(0)}deg)`; } }, 150);
+
+// ---- Descarga para usar sin conexión ----
+const fmtMB = b => (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace(".", ",") + " MB";
+function dlInfo() { try { return JSON.parse(localStorage.getItem("de_mapa") || "null"); } catch { return null; } }
+function paintDl() {
+  const i = dlInfo();
+  $("dlBtn").hidden = false;
+  if (i && i.done && i.v === MAP_VER) {
+    $("dlState").textContent = "Guardado en el móvil ✓";
+    $("dlMeta").textContent = `${fmtMB(i.bytes)} · ${new Date(i.date).toLocaleDateString("es-ES")} · Funciona sin conexión en toda España`;
+    $("dlBtn").textContent = "Actualizar"; $("dlDel").hidden = false;
+  } else {
+    const old = i && i.done && i.v !== MAP_VER;
+    $("dlState").textContent = old ? "Faltan las carreteras locales" : i && i.got ? "Descarga a medias" : "No descargado";
+    $("dlBtn").textContent = old ? "Completar" : i && i.got ? "Continuar" : "Descargar"; $("dlDel").hidden = !(i && i.got);
+    $("dlMeta").textContent = old ? `Ya tienes ${fmtMB(i.bytes)}. Se bajará solo lo nuevo (unos 250–350 MB más). Mejor con wifi.`
+      : "España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 400–500 MB. Mejor con wifi.";
+  }
+  fitMap();
+}
+let downloading = false;
+async function download(refresh) {
+  if (downloading) return;
+  if (!("caches" in window)) { toast("Este navegador no permite guardar el mapa"); return; }
+  if (!navigator.onLine) { toast("Necesitas internet para descargar el mapa"); return; }
+  downloading = true; $("dlBtn").disabled = true; $("dlBar").hidden = false; fitMap();
+  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {}
+  const cache = await caches.open(MAP_CACHE);
+  const urls = tileUrls();
+  let done = 0, bytes = 0, fails = 0;
+  const prev = dlInfo(); if (prev && !refresh) bytes = prev.bytes || 0;
+  $("dlState").textContent = "Descargando…";
+  const queue = urls.slice();
+  async function worker() {
+    while (queue.length) {
+      const u = queue.shift();
+      try {
+        if (!refresh && await cache.match(u)) { done++; continue; }
+        const r = await fetch(u, { mode: "cors" });
+        if (r.ok) { const b = await r.clone().blob(); bytes += b.size; await cache.put(u, r); }
+        else if (r.status !== 404 && r.status !== 204) fails++;
+      } catch { fails++; }
+      done++;
+      if (done % 20 === 0 || done === urls.length) {
+        $("dlFill").style.width = (done / urls.length * 100).toFixed(1) + "%";
+        $("dlMeta").textContent = `${Math.round(done / urls.length * 100)} % · ${fmtMB(bytes)} descargados`;
+        try { localStorage.setItem("de_mapa", JSON.stringify({ got: true, done: false, bytes })); } catch {}
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  const ok = fails < urls.length * 0.02;
+  try { localStorage.setItem("de_mapa", JSON.stringify({ got: true, done: ok, bytes, date: Date.now(), v: MAP_VER })); } catch {}
+  downloading = false; $("dlBtn").disabled = false; $("dlBar").hidden = true;
+  paintDl();
+  if (!ok) { $("dlMeta").textContent = `Faltan partes (${fails} fallos de conexión). Pulsa «Continuar» con buena cobertura.`; }
+  else toast("Mapa guardado: funciona sin conexión");
+}
+$("dlBtn").onclick = () => { const i = dlInfo(); download(!!(i && i.done && i.v === MAP_VER)); };
+$("dlDel").onclick = async () => {
+  try { await caches.delete(MAP_CACHE); localStorage.removeItem("de_mapa"); } catch {}
+  paintDl(); toast("Mapa borrado del móvil");
+};
+
 // ---------- Pestañas ----------
 function showTab(t) {
-  const cmp = t === "cmp";
-  $("tLoc").setAttribute("aria-selected", !cmp); $("tCmp").setAttribute("aria-selected", cmp);
-  $("pLoc").hidden = cmp; $("pCmp").hidden = !cmp;
+  for (const [k, tb, pn] of [["loc", "tLoc", "pLoc"], ["cmp", "tCmp", "pCmp"], ["map", "tMap", "pMap"]]) {
+    $(tb).setAttribute("aria-selected", t === k); $(pn).hidden = t !== k;
+  }
   try { localStorage.setItem("de_tab", t); } catch {}
-  if (cmp) autoCompass();
+  if (t === "cmp") autoCompass();
+  if (t === "map") openMap();
 }
 $("tLoc").onclick = () => showTab("loc");
 $("tCmp").onclick = () => showTab("cmp");
+$("tMap").onclick = () => showTab("map");
 
 // ---------- Brújula ----------
 // Esfera dibujada una vez; luego solo se gira
@@ -536,7 +810,7 @@ async function enableCompass() {
     try {
       const r = await DeviceOrientationEvent.requestPermission();
       const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      if (r !== "granted" && ios) { $("cNote").textContent = "Sin permiso para la brújula. Cierra la app del todo, ábrela otra vez y pulsa «Activar brújula» → Permitir."; return; }
+      if (r !== "granted" && ios) { $("cNote").textContent = "Sin permiso para la brújula. Cierra la app del todo, ábrela otra vez y pulsa «Activar brújula» → Permitir."; toast("Sin permiso de orientación: no se mostrará hacia dónde miras"); return; }
     } catch {}
   }
   startCompass();
@@ -547,7 +821,7 @@ function autoCompass() {
   if (!needsPermission) startCompass();
 }
 $("cOn").onclick = enableCompass;
-try { if (localStorage.getItem("de_tab") === "cmp") showTab("cmp"); } catch {}
+try { const t = localStorage.getItem("de_tab"); if (t === "cmp" || t === "map") showTab(t); } catch {}
 
 // Modo sin conexión: guarda una copia de la app para abrirla sin cobertura
 if ("serviceWorker" in navigator) {
@@ -556,4 +830,3 @@ if ("serviceWorker" in navigator) {
 </script>
 </body>
 </html>
-
