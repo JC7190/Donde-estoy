@@ -535,16 +535,34 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) star
 
 // ---------- Mapa sin conexión ----------
 // Datos: OpenFreeMap (OpenStreetMap) para carreteras, pueblos y picos; relieve de Terrain Tiles (AWS).
-// Todo se guarda en el móvil en una caché aparte que no se borra al actualizar la app.
+// Todo se guarda en el móvil en una base de datos aparte (IndexedDB), no en la caché de la app:
+// Safari lee la caché ENTERA cada vez que se abre la app, y con 300 MB de mapa tardaba segundos en arrancar.
 const ML_VER = "5.24.0";
 const ML_JS = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/maplibre-gl.js`;
 const ML_CSS = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/maplibre-gl.css`;
 const VEC = "https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf";
 const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
-const MAP_CACHE = "mapa-datos";
 const VEC_MAX = 11, DEM_MAX = 8;
-const MAP_VER = 2;   // 2 = con carreteras locales (nivel 11)
+const MAP_VER = 3;   // 3 = guardado en base de datos (antes, en la caché)
+// Base de datos del mapa: cada pieza se guarda con su dirección como clave
+const DB_NAME = "mapa", DB_STORE = "t";
+let dbP = null;
+function mapDB() {
+  return dbP || (dbP = new Promise((ok, ko) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(DB_STORE);
+    r.onsuccess = () => { const d = r.result; d.onversionchange = () => { d.close(); dbP = null; }; ok(d); };
+    r.onerror = () => { dbP = null; ko(r.error); };
+  }));
+}
+function mapTx(mode, fn) {
+  return mapDB().then(d => new Promise((ok, ko) => {
+    const tx = d.transaction(DB_STORE, mode); let res;
+    const q = fn(tx.objectStore(DB_STORE)); if (q) q.onsuccess = () => { res = q.result; };
+    tx.oncomplete = () => ok(res); tx.onerror = tx.onabort = () => ko(tx.error);
+  }));
+}
 // Zonas: península + Baleares, y Canarias
 const AREAS = [[-9.6, 35.8, 4.6, 43.95], [-18.3, 27.5, -13.3, 29.5]];
 const t2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
@@ -628,8 +646,8 @@ function loadMapLibre() {
   if (window.maplibregl) return Promise.resolve();
   if (mlLoading) return mlLoading;
   mlLoading = new Promise((ok, ko) => {
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = ML_CSS; document.head.appendChild(l);
-    const sc = document.createElement("script"); sc.src = ML_JS; sc.onload = ok; sc.onerror = () => { mlLoading = null; ko(); }; document.head.appendChild(sc);
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.crossOrigin = "anonymous"; l.href = ML_CSS; document.head.appendChild(l);
+    const sc = document.createElement("script"); sc.crossOrigin = "anonymous"; sc.src = ML_JS; sc.onload = ok; sc.onerror = () => { mlLoading = null; ko(); }; document.head.appendChild(sc);
   });
   return mlLoading;
 }
@@ -688,41 +706,44 @@ function paintDl() {
     $("dlMeta").textContent = `${fmtMB(i.bytes)} · ${new Date(i.date).toLocaleDateString("es-ES")} · Funciona sin conexión en toda España`;
     $("dlBtn").textContent = "Actualizar"; $("dlDel").hidden = false;
   } else {
-    const old = i && i.done && i.v !== MAP_VER;
-    $("dlState").textContent = old ? "Faltan las carreteras locales" : i && i.got ? "Descarga a medias" : "No descargado";
-    $("dlBtn").textContent = old ? "Completar" : i && i.got ? "Continuar" : "Descargar"; $("dlDel").hidden = !(i && i.got);
-    $("dlMeta").textContent = old ? `Ya tienes ${fmtMB(i.bytes)}. Se bajará solo lo nuevo (unos 250–350 MB más). Mejor con wifi.`
-      : "España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 400–500 MB. Mejor con wifi.";
+    const old = i && (i.v || 0) < MAP_VER;
+    const half = !old && i && i.got;
+    $("dlState").textContent = old ? "Hay que descargarlo otra vez" : half ? "Descarga a medias" : "No descargado";
+    $("dlBtn").textContent = half ? "Continuar" : "Descargar"; $("dlDel").hidden = !half;
+    $("dlMeta").textContent = old ? "El mapa se guarda ahora de otra forma para que la app abra al instante. Descárgalo otra vez (unos 300 MB). Mejor con wifi."
+      : "España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 300 MB. Mejor con wifi.";
   }
   fitMap();
 }
 let downloading = false;
 async function download(refresh) {
   if (downloading) return;
-  if (!("caches" in window)) { toast("Este navegador no permite guardar el mapa"); return; }
+  if (!("indexedDB" in window)) { toast("Este navegador no permite guardar el mapa"); return; }
   if (!navigator.onLine) { toast("Necesitas internet para descargar el mapa"); return; }
   downloading = true; $("dlBtn").disabled = true; $("dlBar").hidden = false; fitMap();
   try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {}
-  const cache = await caches.open(MAP_CACHE);
+  let have;
+  try { have = new Set(refresh ? [] : await mapTx("readonly", s => s.getAllKeys())); }
+  catch { downloading = false; $("dlBtn").disabled = false; $("dlBar").hidden = true; toast("No se pudo abrir el almacenamiento del móvil"); return; }
   const urls = tileUrls();
   let done = 0, bytes = 0, fails = 0;
-  const prev = dlInfo(); if (prev && !refresh) bytes = prev.bytes || 0;
+  const prev = dlInfo(); if (prev && !refresh && (prev.v || 0) >= MAP_VER) bytes = prev.bytes || 0;
   $("dlState").textContent = "Descargando…";
   const queue = urls.slice();
   async function worker() {
     while (queue.length) {
       const u = queue.shift();
       try {
-        if (!refresh && await cache.match(u)) { done++; continue; }
-        const r = await fetch(u, { mode: "cors" });
-        if (r.ok) { const b = await r.clone().blob(); bytes += b.size; await cache.put(u, r); }
+        if (have.has(u)) { done++; continue; }
+        const r = await fetch(u, { mode: "cors", cache: "no-store" });
+        if (r.ok) { const b = await r.arrayBuffer(); bytes += b.byteLength; await mapTx("readwrite", s => s.put({ b, t: r.headers.get("Content-Type") || "" }, u)); }
         else if (r.status !== 404 && r.status !== 204) fails++;
       } catch { fails++; }
       done++;
       if (done % 20 === 0 || done === urls.length) {
         $("dlFill").style.width = (done / urls.length * 100).toFixed(1) + "%";
         $("dlMeta").textContent = `${Math.round(done / urls.length * 100)} % · ${fmtMB(bytes)} descargados`;
-        try { localStorage.setItem("de_mapa", JSON.stringify({ got: true, done: false, bytes })); } catch {}
+        try { localStorage.setItem("de_mapa", JSON.stringify({ got: true, done: false, bytes, v: MAP_VER })); } catch {}
       }
     }
   }
@@ -736,7 +757,7 @@ async function download(refresh) {
 }
 $("dlBtn").onclick = () => { const i = dlInfo(); download(!!(i && i.done && i.v === MAP_VER)); };
 $("dlDel").onclick = async () => {
-  try { await caches.delete(MAP_CACHE); localStorage.removeItem("de_mapa"); } catch {}
+  try { await mapTx("readwrite", s => s.clear()); localStorage.removeItem("de_mapa"); } catch {}
   paintDl(); toast("Mapa borrado del móvil");
 };
 
