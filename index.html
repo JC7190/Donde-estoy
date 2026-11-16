@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#120E0D">
+<meta name="theme-color" content="#F4F2F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#120E0D" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Dónde estoy">
@@ -192,7 +193,7 @@ footer a { color: inherit; }
   <div class="pane" id="pLoc" role="tabpanel" aria-labelledby="tLoc">
   <div class="notice" id="notice" hidden></div>
 
-  <section class="card" aria-live="polite">
+  <section class="card">
     <div class="coord-head">
       <div class="label">Coordenadas</div>
       <div class="meta stamp"><span id="fixDate"></span> · <span id="fixTime"></span></div>
@@ -242,7 +243,7 @@ footer a { color: inherit; }
 
   <div class="pane" id="pCmp" role="tabpanel" aria-labelledby="tCmp" hidden>
     <section class="card cmp">
-      <div class="cmp-read" aria-live="polite">
+      <div class="cmp-read">
         <div class="cmp-deg" id="cDeg">···°</div>
         <div class="cmp-dir" id="cDir">&nbsp;</div>
       </div>
@@ -280,7 +281,7 @@ footer a { color: inherit; }
         <button type="button" class="dl-btn" id="dlBtn">Descargar</button>
       </div>
       <div class="bar" id="dlBar" hidden><span id="dlFill"></span></div>
-      <div class="meta" id="dlMeta">España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 400–500 MB. Mejor con wifi.</div>
+      <div class="meta" id="dlMeta">España entera: carreteras (también las locales), pueblos, picos y relieve. Unos 300 MB. Mejor con wifi.</div>
       <button type="button" class="dl-del" id="dlDel" hidden>Borrar mapa guardado</button>
     </section>
   </div>
@@ -309,7 +310,8 @@ function dms(v, P, N) {
 // Grados y minutos decimales (náutico): 36° 35,587' N
 function dm(v, P, N) {
   const h = v >= 0 ? P : N, a = Math.abs(v);
-  const d = Math.floor(a), m = (a - d) * 60;
+  let d = Math.floor(a), m = Math.round((a - d) * 60000) / 1000;
+  if (m >= 60) { m = 0; d++; }
   return `${d}° ${m.toFixed(3).padStart(6, "0").replace(".", ",")}' ${h}`;
 }
 // ---------- UTM y MGRS (elipsoide WGS84, equivalente a ETRS89 a efectos prácticos) ----------
@@ -396,7 +398,7 @@ function messageText() {
 // Se busca de nuevo cada vez que te mueves más de 15 m.
 const cap = t => String(t || "").toLowerCase().replace(/(^|[\s(\-\/])(\p{L})/gu, (m, a, c) => a + c.toUpperCase());
 // Partículas en minúscula salvo al principio: "Puerto de Santa Maria (El)"
-const capES = t => cap(t).replace(/(?<=\s)(De|Del|La|Las|Los|Y)(?=\s)/g, w => w.toLowerCase());
+const capES = t => cap(t).replace(/(\s)(De|Del|La|Las|Los|Y)(?=\s)/g, (m, sp, w) => sp + w.toLowerCase());
 // Quita tildes y mayúsculas para comparar nombres de calle
 const norm = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 // Tipos de vía habituales, para saber si el nombre ya lo lleva delante
@@ -431,14 +433,22 @@ async function fromOSM(lat, lon) {
     townName: a.city || a.town || a.village || a.municipality || "", province: a.province || "",
   };
 }
+let geoSeq = 0, geoBusy = false, geoNext = 0;
 async function lookupAddress() {
-  if (!pos) return;
+  if (!pos || geoBusy || Date.now() < geoNext) return;
   const here = { lat: pos.lat, lon: pos.lon };
   if (lastGeo && distM(lastGeo, here) < 15) return;
-  lastGeo = here;
+  // Te has movido: la dirección anterior ya no vale (no se manda en el mensaje)
+  if (lastGeo && address) { address = ""; $("addr").textContent = "Actualizando dirección…"; }
+  lastGeo = here; geoBusy = true;
+  const seq = ++geoSeq;
   // Las dos fuentes a la vez: CartoCiudad da el número oficial,
   // OpenStreetMap suele dar el nombre con tildes y con el tipo de vía ("Calle Espíritu Santo")
   const [c, o] = await Promise.allSettled([fromCartoCiudad(here.lat, here.lon), fromOSM(here.lat, here.lon)]);
+  geoBusy = false;
+  // Como mínimo 5 s entre búsquedas (OpenStreetMap pide no más de 1 por segundo)
+  geoNext = Date.now() + 5000;
+  if (seq !== geoSeq) return;
   const cc = c.status === "fulfilled" ? c.value : null;
   const os = o.status === "fulfilled" ? o.value : null;
   let name = "", number = "", town = "", region = "", src = "";
@@ -448,7 +458,7 @@ async function lookupAddress() {
     if (os && os.name) {
       const bare = n => norm(n).replace(VIA, "").trim();
       if (bare(os.name) && bare(os.name) === bare(cc.name)) {
-        name = VIA.test(norm(os.name)) ? os.name : (cc.name.match(VIA)?.[0] ? cc.name.split(" ")[0] + " " + os.name : os.name);
+        name = VIA.test(norm(os.name)) ? os.name : (VIA.test(norm(cc.name)) ? cc.name.split(" ")[0] + " " + os.name : os.name);
       }
     }
     // Municipio y provincia también con tildes si OpenStreetMap los tiene ("El Puerto de Santa María · Cádiz")
@@ -464,7 +474,8 @@ async function lookupAddress() {
     $("addr").textContent = address;
     $("addrMeta").textContent = "Las coordenadas son el dato exacto.";
   } else {
-    lastGeo = null;
+    lastGeo = null; address = "";
+    geoNext = Date.now() + 15000;   // sin conexión: no reintentar con cada lectura del GPS
     $("addr").textContent = "No se pudo obtener la dirección (sin conexión o punto sin calle cercana)";
   }
 }
@@ -485,6 +496,8 @@ function start() {
     pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp };
     render(); lookupAddress(); placeMe(false);
   }, err => {
+    // Con posición ya conocida, un "timeout" solo significa que no hay lectura nueva: el reloj ya avisa
+    if (err.code === 3 && pos) return;
     $("fix").className = "fix"; $("fixTxt").textContent = "Sin ubicación";
     if (err.code === 1) showNotice("<b>No hay permiso para la ubicación.</b>En el iPhone: Ajustes → Privacidad y seguridad → Localización → Sitios web de Safari → «Mientras se usa la app» y «Ubicación exacta» activada.", true);
     else if (err.code === 3) showNotice("<b>El GPS está tardando.</b>Sal a un sitio abierto o acércate a una ventana.", true);
@@ -493,7 +506,8 @@ function start() {
 }
 
 // ---------- Acciones ----------
-function toast(t) { $("toast").textContent = t; setTimeout(() => { $("toast").textContent = ""; }, 2500); }
+let toastT = 0;
+function toast(t) { $("toast").textContent = t; clearTimeout(toastT); toastT = setTimeout(() => { $("toast").textContent = ""; }, 2500); }
 $("copy").onclick = async () => {
   if (!pos) return toast("Aún no hay ubicación");
   try { await navigator.clipboard.writeText(messageText()); toast("Ubicación copiada"); }
@@ -529,7 +543,11 @@ $("fmt").addEventListener("click", e => {
 paintFmt();
 start();
 // Al volver a la app, se reactiva el GPS
-document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
+// y al salir se apaga para no gastar batería
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) start();
+  else if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+});
 
 
 
@@ -674,7 +692,11 @@ async function activateMap() {
   map.on("dragstart", () => { follow = false; $("mCenter").classList.remove("on"); });
   map.on("load", () => { placeMe(true); document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); });
   $("mCenter").classList.add("on");
-  setTimeout(() => { if (!gotReading) mapMsg("Este dispositivo no tiene brújula: no se puede mostrar hacia dónde miras."); setTimeout(() => mapMsg(""), 4000); }, 3500);
+  if (cmpOn) setTimeout(() => {
+    if (gotReading) return;
+    const t = "Este dispositivo no tiene brújula: no se puede mostrar hacia dónde miras.";
+    mapMsg(t); setTimeout(() => { if ($("mMsg").textContent === t) mapMsg(""); }, 4000);
+  }, 3500);
 }
 $("mActivate").onclick = activateMap;
 function placeMe(jump) {
@@ -692,8 +714,6 @@ function placeMe(jump) {
   if (follow) map.jumpTo({ center: [pos.lon, pos.lat], zoom: jump ? Math.max(map.getZoom(), 11) : map.getZoom() });
 }
 $("mCenter").onclick = () => { follow = true; $("mCenter").classList.add("on"); if (pos) placeMe(true); else toast("Aún no hay ubicación"); };
-// Cono de la dirección a la que miras (usa la brújula si está activada)
-setInterval(() => { if (meCone && target != null) { meCone.classList.add("has-dir"); meCone.querySelector("svg").style.transform = `rotate(${target.toFixed(0)}deg)`; } }, 150);
 
 // ---- Descarga para usar sin conexión ----
 const fmtMB = b => (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace(".", ",") + " MB";
@@ -729,14 +749,24 @@ async function download(refresh) {
   let done = 0, bytes = 0, fails = 0;
   const prev = dlInfo(); if (prev && !refresh && (prev.v || 0) >= MAP_VER) bytes = prev.bytes || 0;
   $("dlState").textContent = "Descargando…";
-  const queue = urls.slice();
+  // Las piezas se guardan de 40 en 40 en una sola escritura: mucho más rápido que una a una
+  let next = 0, pending = [];
+  const flush = async () => {
+    if (!pending.length) return;
+    const batch = pending; pending = [];
+    try { await mapTx("readwrite", s => { for (const [k, v] of batch) s.put(v, k); }); }
+    catch { fails += batch.length; }
+  };
   async function worker() {
-    while (queue.length) {
-      const u = queue.shift();
-      try {
-        if (have.has(u)) { done++; continue; }
+    while (next < urls.length) {
+      const u = urls[next++];
+      if (!have.has(u)) try {
         const r = await fetch(u, { mode: "cors", cache: "no-store" });
-        if (r.ok) { const b = await r.arrayBuffer(); bytes += b.byteLength; await mapTx("readwrite", s => s.put({ b, t: r.headers.get("Content-Type") || "" }, u)); }
+        if (r.ok) {
+          const b = await r.arrayBuffer(); bytes += b.byteLength;
+          pending.push([u, { b, t: r.headers.get("Content-Type") || "" }]);
+          if (pending.length >= 40) await flush();
+        }
         else if (r.status !== 404 && r.status !== 204) fails++;
       } catch { fails++; }
       done++;
@@ -748,6 +778,7 @@ async function download(refresh) {
     }
   }
   await Promise.all(Array.from({ length: 6 }, worker));
+  await flush();
   const ok = fails < urls.length * 0.02;
   try { localStorage.setItem("de_mapa", JSON.stringify({ got: true, done: ok, bytes, date: Date.now(), v: MAP_VER })); } catch {}
   downloading = false; $("dlBtn").disabled = false; $("dlBar").hidden = true;
@@ -800,15 +831,32 @@ function onHeading(h) {
   if (shown == null) shown = target;
 }
 // Suavizado: gira por el camino corto (de 359° a 1° no da la vuelta entera)
+let lastDeg = null, lastCone = null, dialSet = false;
 function animate() {
-  if (target != null) {
-    let d = ((target - shown + 540) % 360) - 180;
-    shown += d * 0.18;
-    $("dial").setAttribute("transform", `rotate(${(-shown).toFixed(2)})`);
-    const deg = Math.round((target + 360) % 360) % 360;
-    $("cDeg").textContent = `${deg}°`;
-    const p = PUNTOS[Math.round(deg / 22.5) % 16];
-    $("cDir").textContent = NOMBRES[p] ? `${p} · ${NOMBRES[p]}` : p;
+  if (target != null && !document.hidden) {
+    if (!$("pCmp").hidden) {
+      const d = ((target - shown + 540) % 360) - 180;
+      if (!dialSet || Math.abs(d) > 0.05) {
+        dialSet = true;
+        shown = (shown + d * 0.18 + 360) % 360;
+        $("dial").setAttribute("transform", `rotate(${(-shown).toFixed(2)})`);
+      }
+      const deg = Math.round(target) % 360;
+      if (deg !== lastDeg) {
+        lastDeg = deg;
+        $("cDeg").textContent = `${deg}°`;
+        const p = PUNTOS[Math.round(deg / 22.5) % 16];
+        $("cDir").textContent = NOMBRES[p] ? `${p} · ${NOMBRES[p]}` : p;
+      }
+    }
+    // Punta del punto azul del mapa: hacia dónde miras
+    if (meCone && !$("pMap").hidden) {
+      const c = Math.round(target);
+      if (c !== lastCone) {
+        lastCone = c; meCone.classList.add("has-dir");
+        meCone.firstElementChild.style.transform = `rotate(${c}deg)`;
+      }
+    }
   }
   requestAnimationFrame(animate);
 }
