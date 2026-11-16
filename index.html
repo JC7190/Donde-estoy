@@ -103,7 +103,9 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .notice { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 12px; padding: 14px; font-size: .92rem; }
 .notice b { display: block; margin-bottom: 4px; }
 .notice button { margin-top: 10px; background: var(--ink); color: var(--bg); border: none; border-radius: 8px; padding: 9px 14px; font-weight: 700; }
-.radio { font-size: .88rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
+.radio { font-size: .88rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ver { font: 500 .78rem var(--font-data); white-space: nowrap; }
 .radio b { color: var(--ink); }
 
 
@@ -288,12 +290,15 @@ footer a { color: inherit; }
 
   <div class="toast" id="toast" role="status"></div>
 
-  <div class="radio">En el mar, por radio: <b>VHF canal 16</b>.</div>
+  <div class="radio"><span>En el mar, por radio: <b>VHF canal 16</b>.</span><span class="ver" id="ver"></span></div>
 
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
+// Versión de la app: súbela a la vez que CACHE en sw.js cada vez que publiques cambios
+const APP_VER = 10;
+$("ver").textContent = "v" + APP_VER;
 let pos = null;           // última posición
 let lastGeo = null;       // última posición con dirección buscada
 let address = "";
