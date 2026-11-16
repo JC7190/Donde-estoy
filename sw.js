@@ -1,7 +1,7 @@
 // Copia local de la app para que abra sin conexión.
 // Se abre siempre con la copia guardada (rápido y sin cobertura);
 // la versión nueva se baja por detrás y se ve en la siguiente apertura.
-const CACHE = "donde-estoy-v8";
+const CACHE = "donde-estoy-v9";
 const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png",
   "archivo-latin-500-normal.woff2", "archivo-latin-800-normal.woff2",
   "jetbrains-mono-latin-500-normal.woff2", "jetbrains-mono-latin-700-normal.woff2"];
@@ -64,11 +64,10 @@ self.addEventListener("fetch", e => {
   // Páginas de la app: se abre AL INSTANTE con la copia guardada.
   // Por detrás se descarga la versión nueva, que se verá la próxima vez que se abra.
   if (req.mode === "navigate") {
-    const net = fetch(req, { cache: "no-store" }).then(r => {
-      if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put("index.html", copy)); }
-      return r;
-    });
-    e.waitUntil(net.catch(() => {}));
+    const net = fetch(req, { cache: "no-store" });
+    // waitUntil espera a que la copia nueva quede guardada (si no, el navegador puede cortarla a medias)
+    // (la copia se saca al momento, antes de que la página lea la respuesta)
+    e.waitUntil(net.then(r => { if (!r.ok) return; const copy = r.clone(); return caches.open(CACHE).then(c => c.put("index.html", copy)); }).catch(() => {}));
     e.respondWith(caches.open(CACHE).then(c => c.match("index.html")).then(hit => hit || net));
     return;
   }
