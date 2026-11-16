@@ -2,7 +2,7 @@
 // Se abre siempre con la copia guardada (rápido y sin cobertura);
 // la versión nueva se baja por detrás y se ve en la siguiente apertura.
 // Al publicar cambios, sube este número y también APP_VER en index.html
-const CACHE = "donde-estoy-v11";
+const CACHE = "donde-estoy-v12";
 const APP = ["./", "index.html", "manifest.json", "apple-touch-icon.png", "icon-192.png", "icon-512.png",
   "archivo-latin-500-normal.woff2", "archivo-latin-800-normal.woff2",
   "jetbrains-mono-latin-500-normal.woff2", "jetbrains-mono-latin-700-normal.woff2"];
