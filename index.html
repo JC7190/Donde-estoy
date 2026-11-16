@@ -297,7 +297,7 @@ footer a { color: inherit; }
 <script>
 const $ = id => document.getElementById(id);
 // Versión de la app: súbela a la vez que CACHE en sw.js cada vez que publiques cambios
-const APP_VER = 10;
+const APP_VER = 11;
 $("ver").textContent = "v" + APP_VER;
 let pos = null;           // última posición
 let lastGeo = null;       // última posición con dirección buscada
@@ -856,7 +856,9 @@ function animate() {
     }
     // Punta del punto azul del mapa: hacia dónde miras
     if (meCone && !$("pMap").hidden) {
-      const c = Math.round(target);
+      // El ángulo se va sumando sin volver a 0 (359° → 361°, no → 1°): así la animación
+      // gira por el camino corto al pasar por el norte en vez de dar la vuelta entera
+      const c = lastCone == null ? Math.round(target) : lastCone + Math.round(((target - lastCone) % 360 + 540) % 360 - 180);
       if (c !== lastCone) {
         lastCone = c; meCone.classList.add("has-dir");
         meCone.firstElementChild.style.transform = `rotate(${c}deg)`;
