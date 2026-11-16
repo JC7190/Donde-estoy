@@ -77,6 +77,7 @@ h1 { font: 800 1.6rem/1 var(--font-body); margin: 0; }
 .label { font: 500 .72rem var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
 .coords { font: 700 clamp(1.5rem, 7.2vw, 2.1rem)/1.2 var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .coords span { display: block; }
+.coords.stale { color: var(--muted); }
 .alt { font: 500 1.05rem/1.5 var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .address { font-size: 1.05rem; font-weight: 500; overflow-wrap: anywhere; }
 .coordbody { display: flex; gap: 12px; align-items: flex-start; }
@@ -297,7 +298,7 @@ footer a { color: inherit; }
 <script>
 const $ = id => document.getElementById(id);
 // Versión de la app: súbela a la vez que CACHE en sw.js cada vez que publiques cambios
-const APP_VER = 11;
+const APP_VER = 12;
 $("ver").textContent = "v" + APP_VER;
 let pos = null;           // última posición
 let lastGeo = null;       // última posición con dirección buscada
@@ -372,6 +373,10 @@ const distM = (a, b) => {
   return 2 * R * Math.asin(Math.sqrt(h));
 };
 
+// Antigüedad de la última lectura del GPS, en texto ("40 s", "3 min")
+const ageSec = () => pos ? Math.round((Date.now() - pos.t) / 1000) : 0;
+const ageTxt = s => s < 120 ? s + " s" : Math.round(s / 60) + " min";
+
 // ---------- Pintar ----------
 function render() {
   if (!pos) return;
@@ -394,6 +399,7 @@ function messageText() {
     fmt !== "dec" ? `${dec(lat)}, ${dec(lon)}` : "",
     address ? `Dirección aprox.: ${address}` : "",
     `https://www.google.com/maps/search/?api=1&query=${dec(lat)},${dec(lon)}`,
+    ageSec() > 30 ? `(Última lectura del GPS hace ${ageTxt(ageSec())})` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -520,7 +526,10 @@ $("copy").onclick = async () => {
 };
 $("share").onclick = async () => {
   if (!pos) return toast("Aún no hay ubicación");
-  if (navigator.share) { try { await navigator.share({ title: "Mi ubicación", text: messageText() }); } catch {} }
+  if (navigator.share) {
+    try { await navigator.share({ title: "Mi ubicación", text: messageText() }); }
+    catch (e) { if (e && e.name !== "AbortError") $("copy").click(); }   // cancelar no es un fallo
+  }
   else $("copy").click();
 };
 $("maps").addEventListener("click", e => { if (!pos) { e.preventDefault(); toast("Aún no hay ubicación"); } });
@@ -531,9 +540,13 @@ function tick() {
   $("fixDate").textContent = now.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
   $("fixTime").textContent = now.toLocaleTimeString("es-ES");
   // Si el GPS lleva más de 30 s sin dar una lectura nueva, se avisa
+  // y las coordenadas se ponen en gris para que no parezcan de ahora
   if (pos) {
-    const age = Math.round((now - pos.t) / 1000);
-    if (age > 30) { $("fix").className = "fix weak"; $("fixTxt").textContent = `Última lectura hace ${age < 120 ? age + " s" : Math.round(age / 60) + " min"}`; }
+    const age = ageSec();
+    $("dec").classList.toggle("stale", age > 30);
+    if (age > 30) { $("fix").className = "fix weak"; $("fixTxt").textContent = `Última lectura hace ${ageTxt(age)}`; }
+    // Quieto, el iPhone casi no da lecturas nuevas: así la dirección se reintenta igualmente
+    lookupAddress();
   }
 }
 tick();
@@ -724,6 +737,7 @@ $("mCenter").onclick = () => { follow = true; $("mCenter").classList.add("on"); 
 const fmtMB = b => (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace(".", ",") + " MB";
 function dlInfo() { try { return JSON.parse(localStorage.getItem("de_mapa") || "null"); } catch { return null; } }
 function paintDl() {
+  if (downloading) { fitMap(); return; }   // mientras descarga se queda la barra de progreso
   const i = dlInfo();
   $("dlBtn").hidden = false;
   if (i && i.done && i.v === MAP_VER) {
@@ -793,6 +807,7 @@ async function download(refresh) {
 }
 $("dlBtn").onclick = () => { const i = dlInfo(); download(!!(i && i.done && i.v === MAP_VER)); };
 $("dlDel").onclick = async () => {
+  if (downloading) return;
   try { await mapTx("readwrite", s => s.clear()); localStorage.removeItem("de_mapa"); } catch {}
   paintDl(); toast("Mapa borrado del móvil");
 };
